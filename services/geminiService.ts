@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { ForgeConfig, MannequinParams, RiggingData, ChatMessage } from "../types";
 import { PixelData } from "../core/types";
 
@@ -11,7 +11,6 @@ export class GeminiService {
     return new GoogleGenAI({ apiKey: process.env.API_KEY! });
   }
 
-  // Fix: Added enhancePrompt method required by hooks/useSpriteForge.ts
   static async enhancePrompt(prompt: string): Promise<string> {
     const ai = this.getClient();
     const response = await ai.models.generateContent({
@@ -24,10 +23,13 @@ export class GeminiService {
     return response.text?.trim() || prompt;
   }
 
+  /**
+   * Ejecuta el repintado quirúrgico (in-painting) para añadir atuendos.
+   * Utiliza gemini-2.5-flash-image para manipulación de imagen.
+   */
   static async callAI(userIntent: string, img: PixelData, mask: Uint8Array): Promise<PixelData> {
     const ai = this.getClient();
     
-    // Preparación de buffers para Gemini
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
     canvas.height = img.height;
@@ -36,19 +38,22 @@ export class GeminiService {
     const base64Image = canvas.toDataURL('image/png').split(',')[1];
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/png' } },
-          { text: `SYSTEM_PROTOCOL: SPRITE_FORGE_V5. 
-            USER_INTENT: ${userIntent}. 
-            REPAINT_MASKED_AREA_ONLY. Maintain pixel consistency.` }
+          { text: `OUTFIT_SYNTHESIS_PROTOCOL. 
+            CHARACTER_BASE: Provided in image.
+            DIRECTIVE: Dress this character with: ${userIntent}. 
+            CONSTRAINTS: Strictly maintain the base anatomy, pose, and skin tone. Only modify or add clothing/equipment over the base. 
+            STYLE: 2D Pixel Art, game-ready, sharp outlines. 
+            BACKGROUND: Keep solid magenta #FF00FF.` }
         ]
       }
     });
 
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error("AI_OFFLINE_OR_REJECTED");
+    if (!part?.inlineData?.data) throw new Error("AI_SYNTHESIS_REJECTED: El modelo no pudo procesar el atuendo.");
 
     const resultImg = new Image();
     resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -65,7 +70,7 @@ export class GeminiService {
 
   static async generateBaseMannequin(config: ForgeConfig, params: MannequinParams): Promise<string> {
     const ai = this.getClient();
-    const prompt = `RPG CHARACTER BASE: Full body ${params.gender} anatomy mannequin, ${params.build} build. Static T-Pose, front view. Neutral grey skin/material, no features. NO clothes, NO hair. Background: SOLID MAGENTA #FF00FF ONLY. 2D pixel art style.`;
+    const prompt = `RPG CHARACTER BASE: Full body ${params.gender} anatomy mannequin, ${params.build} build. Static T-Pose, front view. Neutral grey skin material, no facial features, no hair, NO clothes. Background: SOLID MAGENTA #FF00FF. High quality 2D pixel art asset.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -75,10 +80,9 @@ export class GeminiService {
     
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-    throw new Error("GENESIS_FAILED");
+    throw new Error("GENESIS_FAILED: No se pudo generar el maniquí base.");
   }
 
-  // Fix: Cleaned up mapping logic for contents and removed unnecessary 'as any'
   static async getStructuredPrompt(messages: ChatMessage[]): Promise<string> {
     const ai = this.getClient();
     const response = await ai.models.generateContent({
@@ -88,7 +92,7 @@ export class GeminiService {
         parts: [{ text: m.content }] 
       })),
       config: { 
-        systemInstruction: "Eres el Oráculo de SpriteForge. Ayuda al usuario a diseñar atuendos RPG profesionales." 
+        systemInstruction: "Eres el Oráculo de SpriteForge. Ayuda al usuario a diseñar atuendos RPG profesionales detallando materiales y capas." 
       }
     });
     return response.text || "";
@@ -101,7 +105,7 @@ export class GeminiService {
       contents: { 
         parts: [
           { inlineData: { data: url.split(',')[1], mimeType: 'image/png' } }, 
-          { text: "Return a JSON rigging map for this character." }
+          { text: "Identify the main skeletal joints for this 2D character and return them in the requested JSON format." }
         ] 
       },
       config: {
