@@ -42,13 +42,13 @@ export const PromptEngine: React.FC<PromptEngineProps> = ({
               <input 
                 type="text" value={prompt} onChange={e => setPrompt(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && onForge()}
-                placeholder="Directiva neural..."
+                placeholder="Directiva de diseño (ej: armadura de obsidiana)..."
                 className="flex-1 bg-transparent text-[14px] text-white outline-none font-mono-tech placeholder:text-slate-800"
               />
               <button 
                 onClick={onForge} 
-                disabled={isGenerating || !prompt} 
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isGenerating || !prompt ? 'bg-white/5 text-slate-800' : 'bg-indigo-600 text-white shadow-xl active:scale-90'}`}
+                disabled={isGenerating} // Ya no depende de prompt ni de hasApiKey para permitir intentos libres
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isGenerating ? 'bg-white/5 text-slate-800' : 'bg-indigo-600 text-white shadow-xl active:scale-90'}`}
               >
                  <GIcon d={Icons.Forge} size={24} />
               </button>

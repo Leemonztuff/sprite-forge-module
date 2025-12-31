@@ -27,25 +27,24 @@ const App: React.FC = () => {
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
 
-  // Verificación de API Key basada en la inyección de entorno
-  const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY === '' || process.env.API_KEY.includes('placeholder');
+  // Consideramos la llave válida si no es el placeholder por defecto, 
+  // pero permitimos intentar la forja de todos modos (Modo Resiliente)
+  const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY.includes('placeholder');
 
   const handleOpenKeySelector = useCallback(async () => {
     try {
       const aiStudio = (window as any).aistudio;
       if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
-        // Ejecutamos y procedemos asumiendo éxito para evitar bloqueos por race condition
         await aiStudio.openSelectKey();
         forge.setError(null);
-        // Si el usuario estaba bloqueado, lo enviamos a la forja para que pruebe
-        if (activeTab === 'settings') setActiveTab('forge');
       } else {
-        forge.setError("BRIDGE_NOT_FOUND: Reintenta en unos segundos o refresca la página.");
+        // Si no hay bridge, notificamos pero permitimos al usuario intentar usar la key de sistema
+        forge.setError("BRIDGE_NOT_FOUND: El selector de Google no respondió. Si ya configuraste una variable de entorno, puedes intentar forjar directamente.");
       }
     } catch (error: any) {
-      forge.setError("API_SELECTOR_ERROR: " + error.message);
+      forge.setError("SELECTOR_ERROR: " + error.message);
     }
-  }, [forge, activeTab]);
+  }, [forge]);
 
   const handleForge = useCallback(async () => {
     forge.setError(null);
@@ -53,18 +52,16 @@ const App: React.FC = () => {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       const msg = error.message || "";
-      // Manejo específico según lineamientos de la API
-      if (msg.includes("Requested entity was not found")) {
-        forge.setError("PROYECTO_NO_ENCONTRADO: Asegúrate de usar una API Key de un proyecto con facturación activa.");
+      if (msg.includes("Requested entity was not found") || msg.includes("API_KEY_INVALID")) {
+        forge.setError("LLAVE_RECHAZADA: La API Key actual no es válida o no tiene facturación activa.");
         setActiveTab('settings');
-        handleOpenKeySelector();
       } else if (msg.includes("429")) {
-        forge.setError("CUOTA_EXCEDIDA: Límite de la API alcanzado. Espera un momento.");
+        forge.setError("CUOTA_LIMITE: Demasiadas solicitudes. Espera un momento.");
       } else {
-        forge.setError(msg || "Error de síntesis desconocido.");
+        forge.setError(msg || "Error de comunicación con el núcleo de síntesis.");
       }
     }
-  }, [forge, prompt, handleOpenKeySelector]);
+  }, [forge, prompt]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -101,7 +98,7 @@ const App: React.FC = () => {
             onApplyMacro={(macro) => forge.updateConfig({ activeMacroId: macro.id })} 
             onPromoteToBase={(url) => forge.setBaseImage(url)} 
             onUpdateConfig={(conf) => forge.updateConfig(conf)} 
-            hasApiKey={!isApiKeyInvalid} 
+            hasApiKey={true} // Forzamos true para que el botón de forja siempre sea clickable
             isZenMode={isZenMode} 
             setIsZenMode={setIsZenMode} 
           />
