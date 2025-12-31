@@ -1,0 +1,7 @@
+{
+  "name": "Sprite forge 2 module",
+  "description": "Clean-Architecture AI-Powered Sprite Evolution System.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

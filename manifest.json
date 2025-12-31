@@ -1,0 +1,17 @@
+
+{
+  "name": "SpriteForge RPG",
+  "short_name": "SpriteForge",
+  "description": "Neural Sprite Evolution Engine",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3593/3593963.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
