@@ -26,42 +26,25 @@ const App: React.FC = () => {
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
-  const [showKeySelector, setShowKeySelector] = useState(false);
 
   const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY.includes('placeholder');
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (!hasKey) setShowKeySelector(true);
-      }
-    };
-    checkAuth();
-  }, []);
 
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setShowKeySelector(false); 
     }
   };
 
   const handleForge = useCallback(async () => {
-    if (isApiKeyInvalid) {
-      setShowKeySelector(true);
-      return;
-    }
     forge.setError(null);
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       let msg = error.message;
-      if (msg.includes('429')) msg = "CUOTA_AGOTADA: Cambia tu API Key.";
+      if (msg.includes('429')) msg = "CUOTA_AGOTADA: Intenta de nuevo en unos momentos o usa una key personal.";
       forge.setError(msg);
-      if (msg.includes("401") || msg.includes("not found")) setShowKeySelector(true);
     }
-  }, [forge, prompt, isApiKeyInvalid]);
+  }, [forge, prompt]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -78,21 +61,6 @@ const App: React.FC = () => {
         isSettingsPage={activeTab === 'settings'} 
         onOpenKeySelector={handleOpenKeySelector} 
       />
-
-      {showKeySelector && (
-        <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-[#0d0d0d] border border-white/10 rounded-[2.5rem] p-10 text-center space-y-8 shadow-2xl">
-            <div className="w-20 h-20 bg-indigo-600/10 rounded-3xl mx-auto flex items-center justify-center border border-indigo-500/20">
-              <GIcon d={Icons.Lock} size={40} className="text-indigo-500" />
-            </div>
-            <div className="space-y-3">
-              <h2 className="text-[14px] font-black uppercase tracking-[0.4em] text-white">Nucleus Activation</h2>
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Se requiere una API Key de Gemini Pro para habilitar el motor de forja neural.</p>
-            </div>
-            <button onClick={handleOpenKeySelector} className="w-full py-5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/40 active:scale-95 transition-all">Configurar API Key</button>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'forge' && (
         <>
