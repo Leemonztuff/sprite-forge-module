@@ -27,24 +27,44 @@ const App: React.FC = () => {
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
 
-  const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY.includes('placeholder');
+  // Verificación de API Key basada en la inyección de entorno
+  const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY === '' || process.env.API_KEY.includes('placeholder');
 
-  const handleOpenKeySelector = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
+  const handleOpenKeySelector = useCallback(async () => {
+    try {
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+        // Ejecutamos y procedemos asumiendo éxito para evitar bloqueos por race condition
+        await aiStudio.openSelectKey();
+        forge.setError(null);
+        // Si el usuario estaba bloqueado, lo enviamos a la forja para que pruebe
+        if (activeTab === 'settings') setActiveTab('forge');
+      } else {
+        forge.setError("BRIDGE_NOT_FOUND: Reintenta en unos segundos o refresca la página.");
+      }
+    } catch (error: any) {
+      forge.setError("API_SELECTOR_ERROR: " + error.message);
     }
-  };
+  }, [forge, activeTab]);
 
   const handleForge = useCallback(async () => {
     forge.setError(null);
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
-      let msg = error.message;
-      if (msg.includes('429')) msg = "CUOTA_AGOTADA: Intenta de nuevo en unos momentos o usa una key personal.";
-      forge.setError(msg);
+      const msg = error.message || "";
+      // Manejo específico según lineamientos de la API
+      if (msg.includes("Requested entity was not found")) {
+        forge.setError("PROYECTO_NO_ENCONTRADO: Asegúrate de usar una API Key de un proyecto con facturación activa.");
+        setActiveTab('settings');
+        handleOpenKeySelector();
+      } else if (msg.includes("429")) {
+        forge.setError("CUOTA_EXCEDIDA: Límite de la API alcanzado. Espera un momento.");
+      } else {
+        forge.setError(msg || "Error de síntesis desconocido.");
+      }
     }
-  }, [forge, prompt]);
+  }, [forge, prompt, handleOpenKeySelector]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -72,7 +92,7 @@ const App: React.FC = () => {
             onUploadReference={forge.uploadReferenceAsset} 
             onForge={handleForge} 
             onCommit={() => setIsHarmonizerOpen(true)} 
-            onExtractBase={() => console.log('DNA extraction legacy...')} 
+            onExtractBase={() => {}} 
             onGenerateMannequin={forge.generateMannequin} 
             onResetParent={() => forge.setActiveParent(null)} 
             onUpdateMutation={(v) => forge.updateConfig({ mutationStrength: v })} 
