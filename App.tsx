@@ -27,22 +27,38 @@ const App: React.FC = () => {
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
 
-  // Consideramos la llave válida si no es el placeholder por defecto, 
-  // pero permitimos intentar la forja de todos modos (Modo Resiliente)
-  const isApiKeyInvalid = !process.env.API_KEY || process.env.API_KEY.includes('placeholder');
+  const [bridgeStatus, setBridgeStatus] = useState<'checking' | 'active' | 'missing'>('checking');
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if ((window as any).aistudio) {
+        setBridgeStatus('active');
+        clearInterval(interval);
+      }
+    }, 500);
+    
+    const timeout = setTimeout(() => {
+      if (!(window as any).aistudio) setBridgeStatus('missing');
+      clearInterval(interval);
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, []);
 
   const handleOpenKeySelector = useCallback(async () => {
-    try {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+    const aiStudio = (window as any).aistudio;
+    if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+      try {
         await aiStudio.openSelectKey();
         forge.setError(null);
-      } else {
-        // Si no hay bridge, notificamos pero permitimos al usuario intentar usar la key de sistema
-        forge.setError("BRIDGE_NOT_FOUND: El selector de Google no respondió. Si ya configuraste una variable de entorno, puedes intentar forjar directamente.");
+      } catch (err: any) {
+        forge.setError("ERROR_BRIDGE: " + err.message);
       }
-    } catch (error: any) {
-      forge.setError("SELECTOR_ERROR: " + error.message);
+    } else {
+      forge.setError("SISTEMA: El puente de Google AI Studio aún no está listo.");
     }
   }, [forge]);
 
@@ -52,16 +68,21 @@ const App: React.FC = () => {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       const msg = error.message || "";
-      if (msg.includes("Requested entity was not found") || msg.includes("API_KEY_INVALID")) {
-        forge.setError("LLAVE_RECHAZADA: La API Key actual no es válida o no tiene facturación activa.");
-        setActiveTab('settings');
-      } else if (msg.includes("429")) {
-        forge.setError("CUOTA_LIMITE: Demasiadas solicitudes. Espera un momento.");
+      // Detección mejorada de errores de cuota o clave
+      if (
+        msg.includes("Requested entity was not found") || 
+        msg.includes("404") || 
+        msg.includes("429") || 
+        msg.includes("Quota") ||
+        msg.includes("limit")
+      ) {
+        forge.setError("LLAVE_AGOTADA: La cuota de esta API Key se ha consumido o no tiene permisos. Rotando credenciales...");
+        handleOpenKeySelector();
       } else {
-        forge.setError(msg || "Error de comunicación con el núcleo de síntesis.");
+        forge.setError(msg);
       }
     }
-  }, [forge, prompt]);
+  }, [forge, prompt, handleOpenKeySelector]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -98,7 +119,7 @@ const App: React.FC = () => {
             onApplyMacro={(macro) => forge.updateConfig({ activeMacroId: macro.id })} 
             onPromoteToBase={(url) => forge.setBaseImage(url)} 
             onUpdateConfig={(conf) => forge.updateConfig(conf)} 
-            hasApiKey={true} // Forzamos true para que el botón de forja siempre sea clickable
+            hasApiKey={true} 
             isZenMode={isZenMode} 
             setIsZenMode={setIsZenMode} 
           />
@@ -111,7 +132,13 @@ const App: React.FC = () => {
       {activeTab === 'morph' && state.baseImage && <MorphLab state={state} onUpdateMorph={() => {}} onExecute={() => {}} onClose={() => setActiveTab('forge')} />}
       {activeTab === 'rigging' && <RiggingLab state={state} onUpdateJoint={() => {}} onExecuteAnalysis={forge.executeRiggingAnalysis} onClose={() => setActiveTab('forge')} />}
       {activeTab === 'animation' && <AnimationLab state={state} onExecuteAnimation={() => {}} onInterpolate={() => {}} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'settings' && <Settings isApiKeyInvalid={isApiKeyInvalid} onOpenKeySelector={handleOpenKeySelector} />}
+      {activeTab === 'settings' && (
+        <Settings 
+          isApiKeyInvalid={!process.env.API_KEY || process.env.API_KEY.includes('placeholder')} 
+          onOpenKeySelector={handleOpenKeySelector} 
+          hasBridge={bridgeStatus === 'active'} 
+        />
+      )}
 
       {isOracleOpen && <ForgeOracle archetypes={state.archetypes} onInject={setPrompt} onSaveArchetype={forge.saveArchetype} onDeleteArchetype={forge.deleteArchetype} onClose={() => setIsOracleOpen(false)} />}
       

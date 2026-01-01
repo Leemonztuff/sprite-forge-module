@@ -1,34 +1,39 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ForgeConfig, MannequinParams, RiggingData, ChatMessage } from "../types";
+import { ForgeConfig, MannequinParams, RiggingData, ChatMessage, BillingMode } from "../types";
 import { PixelData } from "../core/types";
 
 export class GeminiService {
   /**
-   * Genera el cliente usando exclusivamente la variable de entorno protegida.
+   * Determina el modelo de texto a usar según el modo.
    */
-  private static getClient(): GoogleGenAI {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY! });
+  private static getTextModel(mode: BillingMode): string {
+    return mode === 'ultra' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
   }
 
-  static async enhancePrompt(prompt: string): Promise<string> {
-    const ai = this.getClient();
+  /**
+   * Determina el modelo de imagen a usar según el modo.
+   */
+  private static getImageModel(mode: BillingMode): string {
+    return mode === 'ultra' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+  }
+
+  static async enhancePrompt(prompt: string, mode: BillingMode = 'standard'): Promise<string> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Enhance this RPG character outfit description for a 2D pixel art generator: "${prompt}". Focus on visual details, materials, and specific RPG elements. Keep it concise.`,
+      model: this.getTextModel(mode),
+      contents: `OUTFIT_ENGINEER_PROTOCOL: Create a technical description for a character outfit: "${prompt}". 
+      Focus on clothing layers, materials (leather, silk, steel), and equipment placement. 
+      Constraint: Ensure the description is compatible with a 2D pixel art character in static pose.`,
       config: {
-        systemInstruction: "You are a specialized RPG asset prompt engineer. You take simple descriptions and turn them into detailed prompts for pixel art synthesis."
+        systemInstruction: "You are a professional RPG game artist specializing in sprite design and layered equipment systems."
       }
     });
     return response.text?.trim() || prompt;
   }
 
-  /**
-   * Ejecuta el repintado quirúrgico (in-painting) para añadir atuendos.
-   * Utiliza gemini-2.5-flash-image para manipulación de imagen.
-   */
-  static async callAI(userIntent: string, img: PixelData, mask: Uint8Array): Promise<PixelData> {
-    const ai = this.getClient();
+  static async callAI(userIntent: string, img: PixelData, mask: Uint8Array, config: ForgeConfig): Promise<PixelData> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
@@ -37,23 +42,26 @@ export class GeminiService {
     ctx.putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
     const base64Image = canvas.toDataURL('image/png').split(',')[1];
 
+    const model = this.getImageModel(config.billingMode);
+    
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: model,
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/png' } },
-          { text: `OUTFIT_SYNTHESIS_PROTOCOL. 
-            CHARACTER_BASE: Provided in image.
-            DIRECTIVE: Dress this character with: ${userIntent}. 
-            CONSTRAINTS: Strictly maintain the base anatomy, pose, and skin tone. Only modify or add clothing/equipment over the base. 
-            STYLE: 2D Pixel Art, game-ready, sharp outlines. 
-            BACKGROUND: Keep solid magenta #FF00FF.` }
+          { text: `TECHNICAL_SPRITE_FORGE. 
+            BASE_MANNEQUIN: Provided image.
+            DIRECTIVE: Apply this outfit/equipment: ${userIntent}. 
+            EXECUTION: Only paint the clothing/armor over the body. Do not change the pose, height, or skin tone.
+            STYLE: Clean 2D Pixel Art, game-ready. 
+            BACKGROUND: Solid Magenta (#FF00FF).` }
         ]
-      }
+      },
+      config: model === 'gemini-3-pro-image-preview' ? { imageConfig: { aspectRatio: '1:1', imageSize: '1K' } } : undefined
     });
 
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error("AI_SYNTHESIS_REJECTED: El modelo no pudo procesar el atuendo.");
+    if (!part?.inlineData?.data) throw new Error("API_REJECTED: No se pudo generar el sprite. Revisa tu conexión o créditos.");
 
     const resultImg = new Image();
     resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -69,43 +77,34 @@ export class GeminiService {
   }
 
   static async generateBaseMannequin(config: ForgeConfig, params: MannequinParams): Promise<string> {
-    const ai = this.getClient();
-    const prompt = `RPG CHARACTER BASE: Full body ${params.gender} anatomy mannequin, ${params.build} build. Static T-Pose, front view. Neutral grey skin material, no facial features, no hair, NO clothes. Background: SOLID MAGENTA #FF00FF. High quality 2D pixel art asset.`;
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const model = this.getImageModel(config.billingMode);
+
+    const prompt = `GENESIS_MANNEQUIN: Professional 2D pixel art game asset. 
+    Full body ${params.gender} anatomy, ${params.build} build. 
+    POSE: Static T-Pose, strictly front view. 
+    APPEARANCE: Naked anatomy mannequin, smooth grey-clay material, no clothes, no hair, no face. 
+    TECHNICAL: Sharp edges, pure Magenta background #FF00FF. High quality game-ready asset.`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: model,
       contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: '1:1' } },
+      config: model === 'gemini-3-pro-image-preview' ? { imageConfig: { aspectRatio: '1:1', imageSize: '1K' } } : { imageConfig: { aspectRatio: '1:1' } },
     });
     
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-    throw new Error("GENESIS_FAILED: No se pudo generar el maniquí base.");
+    throw new Error("GENESIS_FAILED: No se pudo crear la base.");
   }
 
-  static async getStructuredPrompt(messages: ChatMessage[]): Promise<string> {
-    const ai = this.getClient();
+  static async analyzeRigging(url: string, mode: BillingMode = 'standard'): Promise<RiggingData> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: messages.map(m => ({ 
-        role: m.role === 'assistant' ? 'model' : 'user', 
-        parts: [{ text: m.content }] 
-      })),
-      config: { 
-        systemInstruction: "Eres el Oráculo de SpriteForge. Ayuda al usuario a diseñar atuendos RPG profesionales detallando materiales y capas." 
-      }
-    });
-    return response.text || "";
-  }
-
-  static async analyzeRigging(url: string): Promise<RiggingData> {
-    const ai = this.getClient();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: this.getTextModel(mode),
       contents: { 
         parts: [
           { inlineData: { data: url.split(',')[1], mimeType: 'image/png' } }, 
-          { text: "Identify the main skeletal joints for this 2D character and return them in the requested JSON format." }
+          { text: "Locate joints: head, neck, shoulders, elbows, wrists, pelvis, knees, ankles." }
         ] 
       },
       config: {
@@ -130,5 +129,20 @@ export class GeminiService {
       }
     });
     return JSON.parse(response.text || "{}");
+  }
+
+  static async getStructuredPrompt(messages: ChatMessage[], mode: BillingMode = 'standard'): Promise<string> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const response = await ai.models.generateContent({
+      model: this.getTextModel(mode),
+      contents: messages.map(m => ({ 
+        role: m.role === 'assistant' ? 'model' : 'user', 
+        parts: [{ text: m.content }] 
+      })),
+      config: { 
+        systemInstruction: "You are the SpriteForge Oracle. Help the user design epic RPG outfits by providing structured technical descriptions." 
+      }
+    });
+    return response.text || "";
   }
 }

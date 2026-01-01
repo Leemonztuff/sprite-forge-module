@@ -19,26 +19,21 @@ export function useSpriteForge() {
     
     store.setLoading(true);
     store.setError(null);
-    addLog(`INIT_NEURAL_FORGE: Sintetizando nueva variante...`, 'process');
+    addLog(`INIT_NEURAL_FORGE: Sintetizando nueva variante (${store.config.billingMode})...`, 'process');
     
     try {
-      // 1. Refuerzo de Directivas
-      const enhancedPrompt = await GeminiService.enhancePrompt(prompt);
-      
-      // 2. Preparación de Píxeles
+      const enhancedPrompt = await GeminiService.enhancePrompt(prompt, store.config.billingMode);
       const pixels = await ImageProcessor.getPixelData(store.activeParent?.url || store.baseImage);
       
-      // 3. Ejecución del Pipeline (En cliente por ahora, API lista para migrar)
       const result = await SpriteForgePipeline.forgeSprite({
         baseImage: pixels,
         outfit: enhancedPrompt,
         classType: 'RPG_Specimen',
         theme: 'Production_Asset',
         sheetMode: store.config.mode === 'Spritesheet',
-        aiExecutor: (p, img, mask) => GeminiService.callAI(p, img, mask)
+        aiExecutor: (p, img, mask) => GeminiService.callAI(p, img, mask, store.config)
       });
 
-      // 4. Conversión a Asset
       const url = ImageProcessor.pixelsToDataUrl(result.image);
       const newAsset = {
         id: crypto.randomUUID(),
@@ -71,7 +66,7 @@ export function useSpriteForge() {
 
   const generateMannequin = useCallback(async (params: MannequinParams) => {
     store.setLoading(true);
-    addLog(`GENERATING_BASE: ${params.gender}_${params.build}`, 'process');
+    addLog(`GENERATING_BASE: ${params.gender}_${params.build} [${store.config.billingMode}]`, 'process');
     try {
       const url = await GeminiService.generateBaseMannequin(store.config, params);
       store.setBaseImage(url);
@@ -132,7 +127,7 @@ export function useSpriteForge() {
       if (!url) return;
       store.setLoading(true);
       try {
-        const data = await GeminiService.analyzeRigging(url);
+        const data = await GeminiService.analyzeRigging(url, store.config.billingMode);
         store.setRigging(data);
         addLog('RIGGING_ANALYSIS_COMPLETE', 'success');
       } catch (e: any) {

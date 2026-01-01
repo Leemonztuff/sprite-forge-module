@@ -3,6 +3,7 @@ import React from 'react';
 
 export type ImageSize = '1K' | '2K' | '4K';
 export type ModelType = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview';
+export type BillingMode = 'standard' | 'ultra';
 export type AspectRatio = '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
 export type BackgroundStyle = 'magenta' | 'white' | 'gray' | 'gradient' | 'dungeon' | 'forest' | 'ui';
 export type ForgeMode = 'Draft' | 'Master' | 'Spritesheet' | 'Orthographic' | 'Animation';
@@ -110,6 +111,7 @@ export interface GeneratedOutfit {
 
 export interface ForgeConfig {
   model: ModelType;
+  billingMode: BillingMode;
   size: ImageSize;
   aspectRatio: AspectRatio;
   mutationStrength: number;
