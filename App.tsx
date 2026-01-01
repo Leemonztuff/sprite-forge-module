@@ -30,13 +30,16 @@ const App: React.FC = () => {
   const [bridgeStatus, setBridgeStatus] = useState<'checking' | 'active' | 'missing'>('checking');
   
   useEffect(() => {
+    // Detectamos si estamos en el entorno de AI Studio para el modo Ultra
     const checkBridge = () => {
       if ((window as any).aistudio) {
         setBridgeStatus('active');
+      } else {
+        setBridgeStatus('missing');
       }
     };
-    const interval = setInterval(checkBridge, 1000);
-    setTimeout(() => { if (!(window as any).aistudio) setBridgeStatus('missing'); }, 5000);
+    checkBridge();
+    const interval = setInterval(checkBridge, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -46,7 +49,9 @@ const App: React.FC = () => {
       await aiStudio.openSelectKey();
       forge.setError(null);
     } else {
-      forge.setError("SISTEMA: El puente de Google AI Studio no está disponible.");
+      // Si no hay puente, simplemente permitimos el modo standard
+      forge.setError("MODO_LOCAL: Usando API Key de sistema (Standard).");
+      setTimeout(() => forge.setError(null), 3000);
     }
   }, [forge]);
 
@@ -56,8 +61,8 @@ const App: React.FC = () => {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       const msg = error.message || "";
-      if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit") || msg.includes("not found")) {
-        forge.setError("CUOTA_AGOTADA: La clave actual no tiene créditos. Pulsa para rotar credenciales.");
+      if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit")) {
+        forge.setError("CUOTA_AGOTADA: Intenta en unos minutos o cambia a Modo Ultra.");
       } else {
         forge.setError(msg);
       }

@@ -16,18 +16,17 @@ export class GeminiService {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const response = await ai.models.generateContent({
       model: this.getTextModel(mode),
-      contents: `OUTFIT_ENGINEER_PROTOCOL: Convert this outfit request into a technical layer description: "${prompt}". 
-      Focus on naming specific gear: chestplate, greaves, tunics, materials. 
-      CRITICAL: The output must describe items that fit a humanoid body perfectly.`,
+      contents: `TECHNICAL_OUTFIT_DECODER: Convert the following user request into a layered clothing description for a character sprite: "${prompt}". 
+      List only the garments, armor pieces, and materials. 
+      CRITICAL: The equipment must be designed to fit a standard humanoid base.`,
       config: {
-        systemInstruction: "You are a lead character designer for a 2D RPG. Your job is to describe how armor and clothes sit on a character base."
+        systemInstruction: "You are a professional game character artist. You define outfits that can be painted over an anatomical base."
       }
     });
     return response.text?.trim() || prompt;
   }
 
   static async callAI(userIntent: string, img: PixelData, mask: Uint8Array, config: ForgeConfig): Promise<PixelData> {
-    // Inicializamos la IA justo antes de la llamada para capturar la clave más reciente (rotada o de sistema)
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const canvas = document.createElement('canvas');
@@ -44,20 +43,22 @@ export class GeminiService {
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/png' } },
-          { text: `SPRITE_EQUIPMENT_OVERLAY_PROTOCOL.
-            ACTION: Paint ONLY these items OVER the character body: ${userIntent}.
-            STRICT_CONSTRAINTS: 
-            1. DO NOT change the body pose, skin color, or body shape.
-            2. The background MUST be pure Magenta (#FF00FF).
-            3. Style: 2D Pixel Art, game-ready sprite, sharp edges.
-            4. Preserve the identity of the base mannequin.` }
+          { text: `OUTFIT_SYNTHESIS_PROTOCOL.
+            OUTFIT: ${userIntent}.
+            ACTION: Paint the outfit OVER the provided mannequin.
+            CONSTRAINTS: 
+            1. DO NOT change skin tone, pose, face, or limb proportions.
+            2. The character must remain in the same exact spot.
+            3. Background MUST be solid Magenta (#FF00FF).
+            4. Style: Sharp 2D pixel art, game-ready sprite.
+            5. ONLY add the equipment requested.` }
         ]
       },
       config: model === 'gemini-3-pro-image-preview' ? { imageConfig: { aspectRatio: '1:1', imageSize: '1K' } } : undefined
     });
 
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error("La IA no generó una imagen. Prueba con una descripción más corta.");
+    if (!part?.inlineData?.data) throw new Error("La IA no pudo procesar la vestimenta. Reintenta.");
 
     const resultImg = new Image();
     resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -76,11 +77,14 @@ export class GeminiService {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const model = this.getImageModel(config.billingMode);
 
-    const prompt = `BASE_MANNEQUIN_GENESIS: Technical 2D pixel art humanoid sprite. 
-    Naked gray clay anatomical mannequin, ${params.build} build. 
-    POSE: T-pose or neutral standing, strictly front view.
-    BACKGROUND: Solid Magenta #FF00FF.
-    No hair, no clothes, high quality game asset.`;
+    // Prompt mandatorio para base desnuda
+    const prompt = `SPRITE_GENESIS: Technical 2D pixel art character asset. 
+    A grey clay anatomical humanoid mannequin. 
+    STRICT_REQUIREMENT: NAKED, NO CLOTHES, NO HAIR, NO ACCESSORIES. 
+    BUILD: ${params.build} body type. 
+    POSE: T-pose or neutral frontal stance.
+    BACKGROUND: Solid Magenta (#FF00FF).
+    Professional game art, clean pixel edges, anatomical dummy.`;
     
     const response = await ai.models.generateContent({
       model: model,
@@ -90,7 +94,7 @@ export class GeminiService {
     
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-    throw new Error("Fallo en Genesis: Comprueba tu conexión o cuota de API.");
+    throw new Error("No se pudo sintetizar el maniquí base. Verifica la cuota de la API.");
   }
 
   static async analyzeRigging(url: string, mode: BillingMode = 'standard'): Promise<RiggingData> {
@@ -136,7 +140,7 @@ export class GeminiService {
         parts: [{ text: m.content }] 
       })),
       config: { 
-        systemInstruction: "You are the SpriteForge Oracle. Help users design outfits for their characters." 
+        systemInstruction: "You are the SpriteForge Oracle. Help users design outfits for character bases." 
       }
     });
     return response.text || "";

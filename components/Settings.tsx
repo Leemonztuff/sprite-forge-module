@@ -14,7 +14,7 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ onOpenKeySelector, hasBridge }) => {
   const store = useForgeStore();
   const { billingMode } = store.config;
-  const apiKeyLabel = process.env.API_KEY ? `****${process.env.API_KEY.slice(-4)}` : 'SISTEMA_BASE';
+  const apiKeyLabel = process.env.API_KEY ? `SISTEMA_STANDBY` : 'SIN_CLAVE';
 
   const handleModeToggle = (mode: BillingMode) => {
     store.updateConfig({ 
@@ -40,6 +40,7 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenKeySelector, hasBridge
              >
                 <GIcon d={Icons.Forge} size={20} />
                 <span className="text-[10px] font-black uppercase">Standard (Gratis)</span>
+                <span className="text-[6px] font-bold uppercase opacity-50">API Pública Activa</span>
              </button>
 
              <button 
@@ -47,26 +48,31 @@ export const Settings: React.FC<SettingsProps> = ({ onOpenKeySelector, hasBridge
               className={`p-6 rounded-3xl border flex flex-col items-center gap-3 transition-all ${billingMode === 'ultra' ? 'bg-amber-600/10 border-amber-500 text-amber-400' : 'bg-black border-white/5 text-slate-600'}`}
              >
                 <GIcon d={Icons.Crystal} size={20} />
-                <span className="text-[10px] font-black uppercase">Ultra (Pro)</span>
+                <span className="text-[10px] font-black uppercase">Ultra (Pago)</span>
+                <span className="text-[6px] font-bold uppercase opacity-50">Requiere Google Key</span>
              </button>
           </div>
         </div>
 
         <div className="bg-[#0d0d0d] border border-white/10 rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black text-white uppercase tracking-widest">Estado de la Clave</span>
-            <span className="text-[8px] font-mono text-emerald-500">{apiKeyLabel}</span>
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">Estado de Conexión</span>
+            <span className={`text-[8px] font-mono ${hasBridge ? 'text-emerald-500' : 'text-amber-500'}`}>
+              {hasBridge ? 'PUENTE_ACTIVO' : 'MODO_SOLITARIO'}
+            </span>
           </div>
           
           <p className="text-[8px] font-mono text-slate-500 uppercase leading-relaxed">
-            Si recibes errores de cuota en el modo gratuito, puedes vincular una nueva clave personal pulsando el botón de abajo.
+            {hasBridge 
+              ? "Conectado al ecosistema Google AI Studio. Puedes rotar tus llaves pagas libremente."
+              : "No se detecta el puente de AI Studio. El sistema usará la llave preconfigurada del servidor."}
           </p>
 
           <button 
             onClick={onOpenKeySelector}
             className="w-full py-6 bg-indigo-600 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all"
           >
-            Vincular / Cambiar API Key
+            Sincronizar nueva llave
           </button>
         </div>
       </div>
