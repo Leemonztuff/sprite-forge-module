@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { useForgeStore } from '../../store/forgeStore';
 
 interface SystemAlertsProps {
   error: string | null;
@@ -10,7 +11,9 @@ interface SystemAlertsProps {
 }
 
 export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError, isSettingsPage, onOpenKeySelector }) => {
-  const isQuotaError = error?.includes('Límite');
+  const store = useForgeStore();
+  const isQuotaError = error?.includes('LLAVE_AGOTADA') || error?.includes('Límite');
+  const hasBase = !!store.baseImage;
 
   return (
     <div className="fixed top-0 inset-x-0 z-[100] pointer-events-none">
@@ -34,12 +37,19 @@ export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError,
         </div>
       )}
 
-      {!isSupabaseConfigured && !error && !isSettingsPage && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center justify-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-[7px] font-black text-amber-500 uppercase tracking-widest">
-            MODO LOCAL: Los assets se perderán al refrescar (Supabase no detectado).
+      {!error && !isSettingsPage && (
+        <div className={`pointer-events-auto transition-all duration-500 border-b px-4 py-1.5 flex items-center justify-center gap-3 ${hasBase ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasBase ? 'bg-indigo-500' : 'bg-amber-500'}`} />
+          <span className={`text-[7px] font-black uppercase tracking-widest ${hasBase ? 'text-indigo-400' : 'text-amber-500'}`}>
+            {hasBase 
+              ? 'FASE_2: Personaje base cargado. Escribe una directiva de atuendo para equiparlo.' 
+              : 'FASE_1: Inicia con "Genesis IA" para crear tu maniquí base.'}
           </span>
+          {!isSupabaseConfigured && (
+            <span className="text-[6px] font-bold text-slate-500 uppercase tracking-widest opacity-40 ml-4 hidden sm:inline">
+              [Modo_Volátil]
+            </span>
+          )}
         </div>
       )}
     </div>

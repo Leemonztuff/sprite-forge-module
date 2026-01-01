@@ -4,16 +4,10 @@ import { ForgeConfig, MannequinParams, RiggingData, ChatMessage, BillingMode } f
 import { PixelData } from "../core/types";
 
 export class GeminiService {
-  /**
-   * Determina el modelo de texto a usar según el modo.
-   */
   private static getTextModel(mode: BillingMode): string {
     return mode === 'ultra' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
   }
 
-  /**
-   * Determina el modelo de imagen a usar según el modo.
-   */
   private static getImageModel(mode: BillingMode): string {
     return mode === 'ultra' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
   }
@@ -22,11 +16,11 @@ export class GeminiService {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const response = await ai.models.generateContent({
       model: this.getTextModel(mode),
-      contents: `OUTFIT_ENGINEER_PROTOCOL: Create a technical description for a character outfit: "${prompt}". 
-      Focus on clothing layers, materials (leather, silk, steel), and equipment placement. 
-      Constraint: Ensure the description is compatible with a 2D pixel art character in static pose.`,
+      contents: `OUTFIT_ENGINEER_PROTOCOL: Convert this outfit request into a technical layer description: "${prompt}". 
+      Focus on naming specific gear: chestplate, greaves, tunics, materials. 
+      CRITICAL: State that the equipment must be fitted to a standard humanoid mannequin.`,
       config: {
-        systemInstruction: "You are a professional RPG game artist specializing in sprite design and layered equipment systems."
+        systemInstruction: "You are a lead character designer for a 2D RPG. Your job is to describe how armor and clothes sit on a character base."
       }
     });
     return response.text?.trim() || prompt;
@@ -49,19 +43,21 @@ export class GeminiService {
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/png' } },
-          { text: `TECHNICAL_SPRITE_FORGE. 
-            BASE_MANNEQUIN: Provided image.
-            DIRECTIVE: Apply this outfit/equipment: ${userIntent}. 
-            EXECUTION: Only paint the clothing/armor over the body. Do not change the pose, height, or skin tone.
-            STYLE: Clean 2D Pixel Art, game-ready. 
-            BACKGROUND: Solid Magenta (#FF00FF).` }
+          { text: `SPRITE_EQUIPMENT_OVERLAY_PROTOCOL.
+            TARGET: The provided character mannequin.
+            ACTION: Paint the following equipment OVER the body: ${userIntent}.
+            STRICT_CONSTRAINTS: 
+            1. DO NOT change the body pose, skin color, or proportions.
+            2. The background must remain pure Magenta (#FF00FF).
+            3. Style must be 2D Pixel Art, game-ready, sharp edges.
+            4. Only add clothes, armor, and accessories. Keep the head shape and limb positions identical.` }
         ]
       },
       config: model === 'gemini-3-pro-image-preview' ? { imageConfig: { aspectRatio: '1:1', imageSize: '1K' } } : undefined
     });
 
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error("API_REJECTED: No se pudo generar el sprite. Revisa tu conexión o créditos.");
+    if (!part?.inlineData?.data) throw new Error("ERROR_SINTESIS: La IA no devolvió una imagen válida. Reintenta con un prompt más simple.");
 
     const resultImg = new Image();
     resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -80,11 +76,13 @@ export class GeminiService {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const model = this.getImageModel(config.billingMode);
 
-    const prompt = `GENESIS_MANNEQUIN: Professional 2D pixel art game asset. 
-    Full body ${params.gender} anatomy, ${params.build} build. 
-    POSE: Static T-Pose, strictly front view. 
-    APPEARANCE: Naked anatomy mannequin, smooth grey-clay material, no clothes, no hair, no face. 
-    TECHNICAL: Sharp edges, pure Magenta background #FF00FF. High quality game-ready asset.`;
+    // Prompt extremadamente específico para el maniquí base sin nada
+    const prompt = `BASE_MANNEQUIN_GENESIS: Technical 2D pixel art character sprite. 
+    A naked, hairless humanoid mannequin, neutral gender features, ${params.build} build. 
+    POSE: Standing straight, strictly front view, arms slightly away from sides.
+    MATERIAL: Smooth grey clay / anatomical dummy style.
+    BACKGROUND: Solid technical Magenta #FF00FF.
+    No clothes, no face details, no hair. Professional game asset quality.`;
     
     const response = await ai.models.generateContent({
       model: model,
@@ -94,7 +92,7 @@ export class GeminiService {
     
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-    throw new Error("GENESIS_FAILED: No se pudo crear la base.");
+    throw new Error("ERROR_GENESIS: No se pudo generar la base. Asegúrate de que el motor esté listo.");
   }
 
   static async analyzeRigging(url: string, mode: BillingMode = 'standard'): Promise<RiggingData> {
@@ -140,7 +138,7 @@ export class GeminiService {
         parts: [{ text: m.content }] 
       })),
       config: { 
-        systemInstruction: "You are the SpriteForge Oracle. Help the user design epic RPG outfits by providing structured technical descriptions." 
+        systemInstruction: "You are the SpriteForge Oracle. Your goal is to help users design armor, clothing, and equipment sets for their base characters." 
       }
     });
     return response.text || "";
