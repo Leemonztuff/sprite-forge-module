@@ -30,35 +30,23 @@ const App: React.FC = () => {
   const [bridgeStatus, setBridgeStatus] = useState<'checking' | 'active' | 'missing'>('checking');
   
   useEffect(() => {
-    const interval = setInterval(() => {
+    const checkBridge = () => {
       if ((window as any).aistudio) {
         setBridgeStatus('active');
-        clearInterval(interval);
       }
-    }, 500);
-    
-    const timeout = setTimeout(() => {
-      if (!(window as any).aistudio) setBridgeStatus('missing');
-      clearInterval(interval);
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
     };
+    const interval = setInterval(checkBridge, 1000);
+    setTimeout(() => { if (!(window as any).aistudio) setBridgeStatus('missing'); }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenKeySelector = useCallback(async () => {
     const aiStudio = (window as any).aistudio;
     if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
-      try {
-        await aiStudio.openSelectKey();
-        forge.setError(null);
-      } catch (err: any) {
-        forge.setError("ERROR_BRIDGE: " + err.message);
-      }
+      await aiStudio.openSelectKey();
+      forge.setError(null);
     } else {
-      forge.setError("SISTEMA: El puente de Google AI Studio aún no está listo.");
+      forge.setError("SISTEMA: El puente de Google AI Studio no está disponible.");
     }
   }, [forge]);
 
@@ -68,21 +56,13 @@ const App: React.FC = () => {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       const msg = error.message || "";
-      // Detección mejorada de errores de cuota o clave
-      if (
-        msg.includes("Requested entity was not found") || 
-        msg.includes("404") || 
-        msg.includes("429") || 
-        msg.includes("Quota") ||
-        msg.includes("limit")
-      ) {
-        forge.setError("LLAVE_AGOTADA: La cuota de esta API Key se ha consumido o no tiene permisos. Rotando credenciales...");
-        handleOpenKeySelector();
+      if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit") || msg.includes("not found")) {
+        forge.setError("CUOTA_AGOTADA: La clave actual no tiene créditos. Pulsa para rotar credenciales.");
       } else {
         forge.setError(msg);
       }
     }
-  }, [forge, prompt, handleOpenKeySelector]);
+  }, [forge, prompt]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -134,7 +114,7 @@ const App: React.FC = () => {
       {activeTab === 'animation' && <AnimationLab state={state} onExecuteAnimation={() => {}} onInterpolate={() => {}} onClose={() => setActiveTab('forge')} />}
       {activeTab === 'settings' && (
         <Settings 
-          isApiKeyInvalid={!process.env.API_KEY || process.env.API_KEY.includes('placeholder')} 
+          isApiKeyInvalid={false} 
           onOpenKeySelector={handleOpenKeySelector} 
           hasBridge={bridgeStatus === 'active'} 
         />
