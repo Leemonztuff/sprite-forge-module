@@ -26,48 +26,51 @@ const App: React.FC = () => {
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
+  const [bridgeReady, setBridgeReady] = useState(false);
 
-  const [bridgeStatus, setBridgeStatus] = useState<'checking' | 'active' | 'missing'>('checking');
-  
   useEffect(() => {
-    // Detectamos si estamos en el entorno de AI Studio para el modo Ultra
     const checkBridge = () => {
-      if ((window as any).aistudio) {
-        setBridgeStatus('active');
-      } else {
-        setBridgeStatus('missing');
-      }
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio) setBridgeReady(true);
     };
-    checkBridge();
-    const interval = setInterval(checkBridge, 5000);
-    return () => clearInterval(interval);
+    const itv = setInterval(checkBridge, 2000);
+    return () => clearInterval(itv);
   }, []);
 
   const handleOpenKeySelector = useCallback(async () => {
     const aiStudio = (window as any).aistudio;
-    if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+    if (aiStudio?.openSelectKey) {
       await aiStudio.openSelectKey();
       forge.setError(null);
     } else {
-      // Si no hay puente, simplemente permitimos el modo standard
-      forge.setError("MODO_LOCAL: Usando API Key de sistema (Standard).");
+      forge.setError("MODO_STANDALONE: Usando clave del servidor.");
       setTimeout(() => forge.setError(null), 3000);
     }
   }, [forge]);
 
   const handleForge = useCallback(async () => {
     forge.setError(null);
+    
+    // Si es modo Ultra, verificamos si hay llave seleccionada según reglas
+    if (state.config.billingMode === 'ultra') {
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio && !(await aiStudio.hasSelectedApiKey())) {
+        await handleOpenKeySelector();
+        // Según reglas, procedemos asumiendo éxito tras abrir el diálogo
+      }
+    }
+
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
       const msg = error.message || "";
-      if (msg.includes("429") || msg.includes("Quota") || msg.includes("limit")) {
-        forge.setError("CUOTA_AGOTADA: Intenta en unos minutos o cambia a Modo Ultra.");
+      if (msg.includes("429") || msg.includes("Quota")) {
+        forge.setError("CUOTA_AGOTADA: Cambia el motor en CORE.");
       } else {
         forge.setError(msg);
       }
     }
-  }, [forge, prompt]);
+  }, [forge, prompt, state.config.billingMode, handleOpenKeySelector]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -121,7 +124,7 @@ const App: React.FC = () => {
         <Settings 
           isApiKeyInvalid={false} 
           onOpenKeySelector={handleOpenKeySelector} 
-          hasBridge={bridgeStatus === 'active'} 
+          hasBridge={bridgeReady} 
         />
       )}
 
