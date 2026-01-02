@@ -27,12 +27,28 @@ const App: React.FC = () => {
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
 
+  // Verificación de autenticación proactiva
+  useEffect(() => {
+    const checkAuth = async () => {
+      const key = process.env.API_KEY;
+      if (!key || key.length < 5) {
+        if (typeof window !== 'undefined' && (window as any).aistudio) {
+          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+          if (!hasKey) {
+            forge.setError("AUTH_REQUIRED: No se ha detectado una API Key activa. Haz clic en 'Vincular API Key' para habilitar el motor.");
+          }
+        }
+      }
+    };
+    checkAuth();
+  }, []);
+
   const handleForge = useCallback(async () => {
     forge.setError(null);
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
-      forge.setError(error.message || "Fallo en el motor.");
+      // El error ya es capturado y procesado por el hook
     }
   }, [forge, prompt]);
 
