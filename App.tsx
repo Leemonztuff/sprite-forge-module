@@ -15,6 +15,8 @@ import { GeneratedOutfit } from './types';
 import { Frame } from './components/Layout/Frame';
 import { SystemAlerts } from './components/Layout/SystemAlerts';
 import { GIcon, Icons } from './components/Icons';
+import { GeminiService } from './services/geminiService';
+import { ApiKeyManagerUI } from './components/ApiKeyManager';
 
 const App: React.FC = () => {
   const forge = useSpriteForge();
@@ -26,21 +28,31 @@ const App: React.FC = () => {
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
+  const [isApiKeyManagerOpen, setIsApiKeyManagerOpen] = useState(false);
 
-  // Verificación de autenticación proactiva
+  // Inicialización del sistema de API keys
   useEffect(() => {
-    const checkAuth = async () => {
-      const key = process.env.API_KEY;
-      if (!key || key.length < 5) {
-        if (typeof window !== 'undefined' && (window as any).aistudio) {
-          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-          if (!hasKey) {
-            forge.setError("AUTH_REQUIRED: No se ha detectado una API Key activa. Haz clic en 'Vincular API Key' para habilitar el motor.");
-          }
-        }
+    const initializeApiKeys = async () => {
+      try {
+        await GeminiService.initializeRotation();
+      } catch (error) {
+        console.error('Failed to initialize API key rotation:', error);
+        forge.setError("Error al inicializar el sistema de API Keys. Por favor, configura tus API Keys.");
       }
     };
-    checkAuth();
+    initializeApiKeys();
+  }, []);
+
+  // Escuchar eventos de API keys
+  useEffect(() => {
+    const handleRequireKey = (event: CustomEvent) => {
+      setIsApiKeyManagerOpen(true);
+    };
+
+    window.addEventListener('require-api-key', handleRequireKey as EventListener);
+    return () => {
+      window.removeEventListener('require-api-key', handleRequireKey as EventListener);
+    };
   }, []);
 
   const handleForge = useCallback(async () => {
@@ -91,6 +103,9 @@ const App: React.FC = () => {
             setIsZenMode={setIsZenMode} 
           />
           <button onClick={() => setIsOracleOpen(true)} className={`absolute right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-indigo-400 ${isZenMode ? 'bottom-6' : 'bottom-32'}`}><GIcon d={Icons.Crystal} size={24} /></button>
+          <button onClick={() => setIsApiKeyManagerOpen(true)} className={`absolute right-6 w-14 h-14 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(147,51,234,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-purple-400 ${isZenMode ? 'bottom-24' : 'bottom-20'}`}>
+            <GIcon d={Icons.Settings} size={20} />
+          </button>
         </>
       )}
       
@@ -120,6 +135,18 @@ const App: React.FC = () => {
           onClose={() => setSelectedOutfit(null)} 
           onDelete={forge.deleteAsset} 
           onSelectAsParent={handleSelectAsParent} 
+        />
+      )}
+
+      {isApiKeyManagerOpen && (
+        <ApiKeyManagerUI
+          isOpen={isApiKeyManagerOpen}
+          onClose={() => setIsApiKeyManagerOpen(false)}
+          onKeyAdded={() => {
+            forge.setError(null);
+            // Reinicializar sistema de API keys
+            GeminiService.initializeRotation();
+          }}
         />
       )}
     </Frame>
