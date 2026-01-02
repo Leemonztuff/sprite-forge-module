@@ -7,11 +7,8 @@ export class GeminiService {
   private static readonly TEXT_MODEL = 'gemini-3-flash-preview';
   private static readonly IMAGE_MODEL = 'gemini-2.5-flash-image';
 
-  /**
-   * Inicializa la instancia de IA directamente usando la variable de entorno inyectada.
-   * Se asume que process.env.API_KEY es válido y accesible.
-   */
   private static getAI() {
+    // Se usa la clave del entorno directamente sin validación previa para evitar bloqueos en Vercel
     return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
 
@@ -19,11 +16,10 @@ export class GeminiService {
     const ai = this.getAI();
     const response = await ai.models.generateContent({
       model: this.TEXT_MODEL,
-      contents: `TECHNICAL_OUTFIT_ANALYST: Analyze this clothing request: "${prompt}". 
-      List only the garments, armor pieces, and materials. 
-      CRITICAL: Designs must fit over a standard humanoid character base.`,
+      contents: `OUTFIT_ANALYST: Analyze this equipment request: "${prompt}". 
+      List only visible garments and materials. Ensure they are designed to be worn over a humanoid base.`,
       config: {
-        systemInstruction: "You are a professional game character artist specializing in equipment design."
+        systemInstruction: "You are a professional game artist specialized in character equipment and sprites."
       }
     });
     return response.text?.trim() || prompt;
@@ -44,20 +40,19 @@ export class GeminiService {
       contents: {
         parts: [
           { inlineData: { data: base64Image, mimeType: 'image/png' } },
-          { text: `SPRITE_OVERLAY_ENGINE.
-            OUTFIT: ${userIntent}.
+          { text: `SPRITE_LAYER_SYSTEM: Paint the following outfit over the character: ${userIntent}.
             RULES: 
-            1. Maintain original character silhouette, face, and skin tone.
-            2. Paint the new outfit directly OVER the mannequin.
-            3. Background MUST remain SOLID MAGENTA (#FF00FF).
-            4. 2D pixel art style, high contrast, clean edges.` }
+            1. Preserve character pose, skin color, and silhouette.
+            2. Background MUST be solid #FF00FF (Magenta).
+            3. 2D pixel art style, no anti-aliasing, clean edges.
+            4. Add clothing and armor directly over the base mannequin.` }
         ]
       },
       config: { imageConfig: { aspectRatio: '1:1' } }
     });
 
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (!part?.inlineData?.data) throw new Error("IA_ERROR: No se pudo sintetizar la ropa.");
+    if (!part?.inlineData?.data) throw new Error("ERROR_SINTESIS: No se recibió imagen del motor.");
 
     const resultImg = new Image();
     resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -75,11 +70,11 @@ export class GeminiService {
   static async generateBaseMannequin(config: ForgeConfig, params: MannequinParams): Promise<string> {
     const ai = this.getAI();
 
-    const prompt = `MANNEQUIN_GENESIS: Technical 2D sprite asset for a game. 
-    A grey clay anatomical humanoid mannequin, ${params.build} build, ${params.gender} gender, front-facing standing pose. 
-    CRITICAL: NO CLOTHES, NO HAIR, NO ACCESSORIES. 
+    const prompt = `SPRITE_BASE_GENESIS: Technical 2D pixel art character base.
+    A featureless grey clay humanoid mannequin, anatomical dummy, standing pose, front view.
+    CRITICAL: NO CLOTHES, NO HAIR, NO ACCESSORIES, NO FACE.
     Background: SOLID MAGENTA (#FF00FF).
-    Professional anatomical dummy, sharp 2D pixel art style.`;
+    Sharp 2D sprite asset for game development.`;
     
     const response = await ai.models.generateContent({
       model: this.IMAGE_MODEL,
@@ -89,7 +84,7 @@ export class GeminiService {
     
     const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-    throw new Error("GENESIS_FAIL: No se pudo generar la base.");
+    throw new Error("GENESIS_FAILED: Fallo al generar el maniquí base.");
   }
 
   static async analyzeRigging(url: string): Promise<RiggingData> {
@@ -99,7 +94,7 @@ export class GeminiService {
       contents: { 
         parts: [
           { inlineData: { data: url.split(',')[1], mimeType: 'image/png' } }, 
-          { text: "Map joints for character rigging: head, neck, shoulders, elbows, wrists, pelvis, knees, ankles." }
+          { text: "Identify joints for standard 2D rigging: head, neck, shoulders, elbows, wrists, pelvis, knees, ankles." }
         ] 
       },
       config: {
@@ -135,7 +130,7 @@ export class GeminiService {
         parts: [{ text: m.content }] 
       })),
       config: { 
-        systemInstruction: "You are the SpriteForge Oracle. Help users define perfect clothing descriptions for their RPG character sprites." 
+        systemInstruction: "You are the SpriteForge Oracle. Help create precise equipment descriptions for character bases." 
       }
     });
     return response.text || "";

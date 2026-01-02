@@ -31,8 +31,8 @@ export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError,
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasBase ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
           <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${hasBase ? 'text-indigo-400' : 'text-emerald-500'}`}>
             {hasBase 
-              ? 'ENGINE: ANALYTICS LOADED. READY TO FORGE.' 
-              : 'DIRECTIVE: INITIALIZE GENESIS TO START.'}
+              ? 'CORE_ENGINE: ANALYTICS_READY' 
+              : 'DIRECTIVE: INITIALIZE_GENESIS'}
           </span>
         </div>
       )}
