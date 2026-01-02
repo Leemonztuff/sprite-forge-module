@@ -11,18 +11,42 @@ interface SystemAlertsProps {
 export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError, isSettingsPage }) => {
   const store = useForgeStore();
   const hasBase = !!store.baseImage;
+  const isKeyError = error?.includes("ENLACE_REQUERIDO") || error?.includes("API KEY");
+
+  const handleFixKey = async () => {
+    if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
+      await (window as any).aistudio.openSelectKey();
+      onClearError();
+    }
+  };
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[100] pointer-events-none">
+    <div className="fixed top-0 inset-x-0 z-[9000] pointer-events-none">
       {error && (
-        <div className="pointer-events-auto bg-black/90 backdrop-blur-xl border-b border-rose-500/30 px-6 py-4 flex items-center justify-between gap-6 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-4">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
-            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest truncate max-w-[280px] sm:max-w-none">
-              SYSTEM_FAULT: {error}
-            </span>
+        <div className="pointer-events-auto bg-black/95 backdrop-blur-2xl border-b border-rose-500/30 px-6 py-5 flex items-center justify-between gap-6 animate-in slide-in-from-top duration-500 shadow-2xl">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className={`w-3 h-3 rounded-full ${isKeyError ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse shadow-[0_0_15px_currentColor]`} />
+            <div className="flex flex-col min-w-0">
+              <span className={`text-[10px] font-black uppercase tracking-widest ${isKeyError ? 'text-amber-500' : 'text-rose-500'}`}>
+                {isKeyError ? 'ENLACE_NEURONAL_PENDIENTE' : 'FALLO_DE_SINTESIS'}
+              </span>
+              <span className="text-[9px] font-mono text-slate-400 truncate opacity-80">
+                {error}
+              </span>
+            </div>
           </div>
-          <button onClick={onClearError} className="text-white/40 hover:text-white font-black text-[18px] p-2 transition-colors">&times;</button>
+          
+          <div className="flex items-center gap-3 shrink-0">
+            {isKeyError && (
+              <button 
+                onClick={handleFixKey}
+                className="px-5 py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+              >
+                Vincular API Key
+              </button>
+            )}
+            <button onClick={onClearError} className="text-white/40 hover:text-white font-black text-[20px] p-2">&times;</button>
+          </div>
         </div>
       )}
 

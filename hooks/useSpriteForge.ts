@@ -19,11 +19,9 @@ export function useSpriteForge() {
     
     store.setLoading(true);
     store.setError(null);
-    // Removed usage of non-existent billingMode property
     addLog(`INIT_NEURAL_FORGE: Sintetizando nueva variante...`, 'process');
     
     try {
-      // Fix: GeminiService.enhancePrompt expects 1 argument, but got 2 (line 25 error)
       const enhancedPrompt = await GeminiService.enhancePrompt(prompt);
       const pixels = await ImageProcessor.getPixelData(store.activeParent?.url || store.baseImage);
       
@@ -55,10 +53,8 @@ export function useSpriteForge() {
       store.setPendingOutfit(newAsset);
       addLog(`FORGE_SUCCESS: Drift_Score: ${(result.drift * 100).toFixed(1)}%`, 'success');
     } catch (error: any) {
-      let errorMsg = error.message;
-      if (errorMsg === "IDENTITY_DRIFT") errorMsg = "DRIFT_DETECTED: Anatomía comprometida.";
-      if (errorMsg.includes("fetch")) errorMsg = "NETWORK_ERROR: Verifica tu conexión o API Key.";
-      
+      console.error("FORGE_ERROR:", error);
+      const errorMsg = error.message || "Error desconocido en el motor.";
       store.setError(errorMsg);
       addLog(errorMsg, 'error');
     } finally {
@@ -68,7 +64,7 @@ export function useSpriteForge() {
 
   const generateMannequin = useCallback(async (params: MannequinParams) => {
     store.setLoading(true);
-    // Removed usage of non-existent billingMode property
+    store.setError(null);
     addLog(`GENERATING_BASE: ${params.gender}_${params.build}`, 'process');
     try {
       const url = await GeminiService.generateBaseMannequin(store.config, params);
@@ -130,7 +126,6 @@ export function useSpriteForge() {
       if (!url) return;
       store.setLoading(true);
       try {
-        // Fix: GeminiService.analyzeRigging expects 1 argument, but got 2 (line 130 error)
         const data = await GeminiService.analyzeRigging(url);
         store.setRigging(data);
         addLog('RIGGING_ANALYSIS_COMPLETE', 'success');
