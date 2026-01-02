@@ -7,8 +7,16 @@ export class GeminiService {
   private static readonly TEXT_MODEL = 'gemini-3-flash-preview';
   private static readonly IMAGE_MODEL = 'gemini-2.5-flash-image';
 
+  private static getAI() {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY_MISSING: No se detectó la clave de API en el entorno. Verifica la configuración de Vercel.");
+    }
+    return new GoogleGenAI({ apiKey });
+  }
+
   static async enhancePrompt(prompt: string): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = this.getAI();
     const response = await ai.models.generateContent({
       model: this.TEXT_MODEL,
       contents: `TECHNICAL_OUTFIT_ANALYST: Analyze this clothing request: "${prompt}". 
@@ -22,7 +30,7 @@ export class GeminiService {
   }
 
   static async callAI(userIntent: string, img: PixelData, mask: Uint8Array, config: ForgeConfig): Promise<PixelData> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = this.getAI();
     
     const canvas = document.createElement('canvas');
     canvas.width = img.width;
@@ -65,13 +73,13 @@ export class GeminiService {
   }
 
   static async generateBaseMannequin(config: ForgeConfig, params: MannequinParams): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = this.getAI();
 
-    const prompt = `MANNEQUIN_GENESIS: Technical 2D sprite asset. 
-    A grey clay anatomical humanoid mannequin, ${params.build} build, front view. 
-    STRICTLY NAKED, NO HAIR, NO CLOTHES. 
+    const prompt = `MANNEQUIN_GENESIS: Technical 2D sprite asset for a game. 
+    A grey clay anatomical humanoid mannequin, ${params.build} build, ${params.gender} gender, front-facing standing pose. 
+    CRITICAL: NO CLOTHES, NO HAIR, NO ACCESSORIES. 
     Background: SOLID MAGENTA (#FF00FF).
-    Professional anatomical dummy, pixel art style.`;
+    Professional anatomical dummy, sharp 2D pixel art style.`;
     
     const response = await ai.models.generateContent({
       model: this.IMAGE_MODEL,
@@ -85,7 +93,7 @@ export class GeminiService {
   }
 
   static async analyzeRigging(url: string): Promise<RiggingData> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = this.getAI();
     const response = await ai.models.generateContent({
       model: this.TEXT_MODEL,
       contents: { 
@@ -119,7 +127,7 @@ export class GeminiService {
   }
 
   static async getStructuredPrompt(messages: ChatMessage[]): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = this.getAI();
     const response = await ai.models.generateContent({
       model: this.TEXT_MODEL,
       contents: messages.map(m => ({ 
@@ -127,7 +135,7 @@ export class GeminiService {
         parts: [{ text: m.content }] 
       })),
       config: { 
-        systemInstruction: "You are the SpriteForge Oracle. Help users define perfect clothing descriptions." 
+        systemInstruction: "You are the SpriteForge Oracle. Help users define perfect clothing descriptions for their RPG character sprites." 
       }
     });
     return response.text || "";

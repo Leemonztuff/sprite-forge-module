@@ -29,7 +29,7 @@ export const ANATOMICAL_MACROS: NeuralMacro[] = [
 export const OUTFIT_PRESETS = [
   { name: 'Paladín', prompt: 'Armadura de placas plateada, capa blanca, detalles dorados' },
   { name: 'Sombra', prompt: 'Ropajes de cuero negro, capucha, dagas en el cinturón, sigiloso' },
-  { name: 'Archimago', prompt: 'Túnicas de seda púrpura con bordados rúnicos brillantes, cinturón de cuero' },
+  { name: 'Archimago', prompt: 'Túnicas de seda púrpura con bordados rúnicos brillantes, túnica larga' },
   { name: 'Ciber-Soldado', prompt: 'Traje táctico negro con luces de neón cian, visor tecnológico, placas metálicas' }
 ];
 
@@ -43,7 +43,6 @@ export const INITIAL_NEURAL_CHAIN: NeuralNode[] = [
 
 export const DEFAULT_CONFIG: ForgeConfig = {
   model: 'gemini-2.5-flash-image',
-  // Removed non-existent property billingMode to fix the error in constants.ts line 46
   size: '1K',
   aspectRatio: '1:1',
   mutationStrength: 50,
