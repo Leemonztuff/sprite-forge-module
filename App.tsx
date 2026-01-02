@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useSpriteForge } from './hooks/useSpriteForge';
 import { Atelier } from './components/Atelier';
 import { EvolutionTree } from './components/EvolutionTree';
@@ -26,51 +26,15 @@ const App: React.FC = () => {
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
-  const [bridgeReady, setBridgeReady] = useState(false);
-
-  useEffect(() => {
-    const checkBridge = () => {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio) setBridgeReady(true);
-    };
-    const itv = setInterval(checkBridge, 2000);
-    return () => clearInterval(itv);
-  }, []);
-
-  const handleOpenKeySelector = useCallback(async () => {
-    const aiStudio = (window as any).aistudio;
-    if (aiStudio?.openSelectKey) {
-      await aiStudio.openSelectKey();
-      forge.setError(null);
-    } else {
-      forge.setError("MODO_STANDALONE: Usando clave del servidor.");
-      setTimeout(() => forge.setError(null), 3000);
-    }
-  }, [forge]);
 
   const handleForge = useCallback(async () => {
     forge.setError(null);
-    
-    // Si es modo Ultra, verificamos si hay llave seleccionada según reglas
-    if (state.config.billingMode === 'ultra') {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio && !(await aiStudio.hasSelectedApiKey())) {
-        await handleOpenKeySelector();
-        // Según reglas, procedemos asumiendo éxito tras abrir el diálogo
-      }
-    }
-
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
-      const msg = error.message || "";
-      if (msg.includes("429") || msg.includes("Quota")) {
-        forge.setError("CUOTA_AGOTADA: Cambia el motor en CORE.");
-      } else {
-        forge.setError(msg);
-      }
+      forge.setError(error.message || "Error desconocido en el motor.");
     }
-  }, [forge, prompt, state.config.billingMode, handleOpenKeySelector]);
+  }, [forge, prompt]);
 
   const handleSelectAsParent = useCallback((o: GeneratedOutfit) => {
     forge.setActiveParent(o); 
@@ -85,7 +49,6 @@ const App: React.FC = () => {
         error={state.error} 
         onClearError={() => forge.setError(null)} 
         isSettingsPage={activeTab === 'settings'} 
-        onOpenKeySelector={handleOpenKeySelector} 
       />
 
       {activeTab === 'forge' && (
@@ -120,13 +83,7 @@ const App: React.FC = () => {
       {activeTab === 'morph' && state.baseImage && <MorphLab state={state} onUpdateMorph={() => {}} onExecute={() => {}} onClose={() => setActiveTab('forge')} />}
       {activeTab === 'rigging' && <RiggingLab state={state} onUpdateJoint={() => {}} onExecuteAnalysis={forge.executeRiggingAnalysis} onClose={() => setActiveTab('forge')} />}
       {activeTab === 'animation' && <AnimationLab state={state} onExecuteAnimation={() => {}} onInterpolate={() => {}} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'settings' && (
-        <Settings 
-          isApiKeyInvalid={false} 
-          onOpenKeySelector={handleOpenKeySelector} 
-          hasBridge={bridgeReady} 
-        />
-      )}
+      {activeTab === 'settings' && <Settings />}
 
       {isOracleOpen && <ForgeOracle archetypes={state.archetypes} onInject={setPrompt} onSaveArchetype={forge.saveArchetype} onDeleteArchetype={forge.deleteArchetype} onClose={() => setIsOracleOpen(false)} />}
       

@@ -43,7 +43,7 @@ export const INITIAL_NEURAL_CHAIN: NeuralNode[] = [
 
 export const DEFAULT_CONFIG: ForgeConfig = {
   model: 'gemini-2.5-flash-image',
-  billingMode: 'standard',
+  // Removed non-existent property billingMode to fix the error in constants.ts line 46
   size: '1K',
   aspectRatio: '1:1',
   mutationStrength: 50,

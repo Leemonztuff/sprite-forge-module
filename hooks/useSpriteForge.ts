@@ -19,10 +19,12 @@ export function useSpriteForge() {
     
     store.setLoading(true);
     store.setError(null);
-    addLog(`INIT_NEURAL_FORGE: Sintetizando nueva variante (${store.config.billingMode})...`, 'process');
+    // Removed usage of non-existent billingMode property
+    addLog(`INIT_NEURAL_FORGE: Sintetizando nueva variante...`, 'process');
     
     try {
-      const enhancedPrompt = await GeminiService.enhancePrompt(prompt, store.config.billingMode);
+      // Fix: GeminiService.enhancePrompt expects 1 argument, but got 2 (line 25 error)
+      const enhancedPrompt = await GeminiService.enhancePrompt(prompt);
       const pixels = await ImageProcessor.getPixelData(store.activeParent?.url || store.baseImage);
       
       const result = await SpriteForgePipeline.forgeSprite({
@@ -66,7 +68,8 @@ export function useSpriteForge() {
 
   const generateMannequin = useCallback(async (params: MannequinParams) => {
     store.setLoading(true);
-    addLog(`GENERATING_BASE: ${params.gender}_${params.build} [${store.config.billingMode}]`, 'process');
+    // Removed usage of non-existent billingMode property
+    addLog(`GENERATING_BASE: ${params.gender}_${params.build}`, 'process');
     try {
       const url = await GeminiService.generateBaseMannequin(store.config, params);
       store.setBaseImage(url);
@@ -127,7 +130,8 @@ export function useSpriteForge() {
       if (!url) return;
       store.setLoading(true);
       try {
-        const data = await GeminiService.analyzeRigging(url, store.config.billingMode);
+        // Fix: GeminiService.analyzeRigging expects 1 argument, but got 2 (line 130 error)
+        const data = await GeminiService.analyzeRigging(url);
         store.setRigging(data);
         addLog('RIGGING_ANALYSIS_COMPLETE', 'success');
       } catch (e: any) {
