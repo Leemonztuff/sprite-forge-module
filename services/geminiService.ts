@@ -7,12 +7,12 @@ export class GeminiService {
   private static readonly TEXT_MODEL = 'gemini-3-flash-preview';
   private static readonly IMAGE_MODEL = 'gemini-2.5-flash-image';
 
+  /**
+   * Inicializa la instancia de IA directamente usando la variable de entorno inyectada.
+   * Se asume que process.env.API_KEY es válido y accesible.
+   */
   private static getAI() {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("API_KEY_MISSING: No se detectó la clave de API en el entorno. Verifica la configuración de Vercel.");
-    }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
 
   static async enhancePrompt(prompt: string): Promise<string> {

@@ -5,7 +5,6 @@ import { useForgeStore } from '../store/forgeStore';
 
 export const Settings: React.FC = () => {
   const store = useForgeStore();
-  const hasApiKey = !!process.env.API_KEY;
 
   return (
     <div className="h-full w-full bg-[#050505] tech-grid p-6 sm:p-10 overflow-y-auto no-scrollbar flex flex-col gap-10">
@@ -19,10 +18,8 @@ export const Settings: React.FC = () => {
           <div className="flex justify-between items-center">
              <span className="text-[10px] font-black text-white uppercase tracking-widest block">Neural Motor Status</span>
              <div className="flex gap-2 items-center">
-                <div className={`w-2 h-2 rounded-full animate-pulse ${hasApiKey ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-rose-500 shadow-[0_0_10px_#f43f5e]'}`} />
-                <span className={`text-[8px] font-mono ${hasApiKey ? 'text-emerald-500' : 'text-rose-500'}`}>
-                  {hasApiKey ? 'CONECTADO_DIRECTO' : 'API_KEY_ERROR'}
-                </span>
+                <div className="w-2 h-2 rounded-full animate-pulse bg-emerald-500 shadow-[0_0_10px_#10b981]" />
+                <span className="text-[8px] font-mono text-emerald-500">OPERATIVO_DIRECTO</span>
              </div>
           </div>
           

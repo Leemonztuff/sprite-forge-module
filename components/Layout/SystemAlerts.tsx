@@ -11,7 +11,6 @@ interface SystemAlertsProps {
 export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError, isSettingsPage }) => {
   const store = useForgeStore();
   const hasBase = !!store.baseImage;
-  const hasApiKey = !!process.env.API_KEY;
 
   return (
     <div className="fixed top-0 inset-x-0 z-[100] pointer-events-none">
@@ -27,16 +26,7 @@ export const SystemAlerts: React.FC<SystemAlertsProps> = ({ error, onClearError,
         </div>
       )}
 
-      {!hasApiKey && !error && (
-        <div className="pointer-events-auto bg-rose-600/90 backdrop-blur-md border-b border-white/20 px-6 py-3 flex items-center justify-center gap-4 animate-in slide-in-from-top">
-          <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          <span className="text-[9px] font-black text-white uppercase tracking-[0.3em]">
-            ERROR_ENTORNO: LA API_KEY NO ESTÁ CARGADA EN VERCEL.
-          </span>
-        </div>
-      )}
-
-      {!error && hasApiKey && !isSettingsPage && (
+      {!error && !isSettingsPage && (
         <div className={`pointer-events-auto transition-all duration-700 border-b px-6 py-2.5 flex items-center justify-center gap-4 ${hasBase ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-emerald-500/5 border-emerald-500/10'}`}>
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasBase ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
           <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${hasBase ? 'text-indigo-400' : 'text-emerald-500'}`}>
