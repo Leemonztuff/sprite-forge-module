@@ -3,69 +3,55 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ForgeConfig, MannequinParams, RiggingData, ChatMessage } from "../types";
 import { PixelData } from "../core/types";
 
-/**
- * GeminiService Reconstruido v2.0
- * Implementa el protocolo BYOK (Bring Your Own Key) para entornos Vercel/Browser.
- */
 export class GeminiService {
   private static readonly TEXT_MODEL = 'gemini-3-flash-preview';
   private static readonly IMAGE_MODEL = 'gemini-2.5-flash-image';
 
   /**
-   * Obtiene una instancia fresca del SDK.
-   * Si no hay llave, solicita la apertura del selector de AI Studio.
+   * Asegura que el usuario tenga una llave seleccionada antes de proceder.
    */
-  private static async getAIInstance(): Promise<GoogleGenAI> {
-    // 1. Verificar si ya tenemos una llave seleccionada
-    const isKeySelected = typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey 
-      ? await (window as any).aistudio.hasSelectedApiKey() 
-      : !!process.env.API_KEY;
-
-    // 2. Si no hay llave y estamos en el navegador, abrimos el selector
-    if (!isKeySelected && typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
-      await (window as any).aistudio.openSelectKey();
-      // El flujo continua asumiendo que el usuario seleccionará una llave
+  private static async ensureKeyConnection() {
+    if (typeof window !== 'undefined' && (window as any).aistudio) {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await (window as any).aistudio.openSelectKey();
+        // Según documentación: "assume the key selection was successful after triggering openSelectKey and proceed"
+      }
     }
-
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("ENLACE_REQUERIDO: Por favor, selecciona tu API Key de Google AI Studio para activar la forja.");
-    }
-
-    return new GoogleGenAI({ apiKey });
   }
 
-  /**
-   * Manejador de errores estandarizado para la industria.
-   */
-  private static handleError(error: any): never {
-    console.error("[AI_CORE_ERROR]:", error);
+  private static handleAIError(error: any): never {
+    console.error("[AI_FAULT]:", error);
     const msg = error.message || "";
-    
-    if (msg.includes("429")) throw new Error("MOTOR_SATURADO: Límite de ráfaga (Free Tier). Espera 60s.");
-    if (msg.includes("403")) throw new Error("ACCESO_DENEGADO: Tu API Key no tiene permisos o es inválida.");
-    if (msg.includes("ENLACE_REQUERIDO")) throw error;
-    
-    throw new Error(`FALLO_SINTESIS: ${msg.slice(0, 50)}...`);
+    if (msg.includes("429")) throw new Error("MOTOR_SATURADO: Límite de ráfaga alcanzado. Espera 60s.");
+    if (msg.includes("not found")) {
+      // Si la entidad no se encuentra, es probable que la llave no esté vinculada correctamente
+      if (typeof window !== 'undefined' && (window as any).aistudio?.openSelectKey) {
+        (window as any).aistudio.openSelectKey();
+      }
+      throw new Error("RECONEXIÓN_REQUERIDA: Selecciona una API Key válida.");
+    }
+    throw new Error(msg || "ERROR_SINTESIS_IA");
   }
 
   static async enhancePrompt(prompt: string): Promise<string> {
     try {
-      const ai = await this.getAIInstance();
+      await this.ensureKeyConnection();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       const response = await ai.models.generateContent({
         model: this.TEXT_MODEL,
-        contents: `OUTFIT_ANALYST: Improve this game asset prompt: "${prompt}". Focus on pixel art materials.`,
-        config: { systemInstruction: "Expert pixel art game designer." }
+        contents: `Analiza y mejora este prompt de pixel art para RPG: "${prompt}". Devuelve solo la descripción mejorada.`,
       });
       return response.text?.trim() || prompt;
     } catch (e) {
-      this.handleError(e);
+      this.handleAIError(e);
     }
   }
 
   static async callAI(userIntent: string, img: PixelData, mask: Uint8Array, config: ForgeConfig): Promise<PixelData> {
     try {
-      const ai = await this.getAIInstance();
+      await this.ensureKeyConnection();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -79,15 +65,15 @@ export class GeminiService {
         contents: {
           parts: [
             { inlineData: { data: base64Image, mimeType: 'image/png' } },
-            { text: `SPRITE_EQUIPMENT_SYSTEM: Paint this outfit: ${userIntent}. 
-              Maintain silhouette and skin. Solid #FF00FF background. 2D pixel art.` }
+            { text: `SPRITE_LAYER: Paint the following outfit over the mannequin: ${userIntent}. 
+              Keep pose and silhouette. Solid #FF00FF background. 2D pixel art asset.` }
           ]
         },
         config: { imageConfig: { aspectRatio: '1:1' } }
       });
 
       const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-      if (!part?.inlineData?.data) throw new Error("La IA no devolvió datos visuales.");
+      if (!part?.inlineData?.data) throw new Error("No se recibió imagen.");
 
       const resultImg = new Image();
       resultImg.src = `data:image/png;base64,${part.inlineData.data}`;
@@ -101,14 +87,16 @@ export class GeminiService {
         data: ctx.getImageData(0, 0, canvas.width, canvas.height).data 
       };
     } catch (e) {
-      this.handleError(e);
+      this.handleAIError(e);
     }
   }
 
   static async generateBaseMannequin(config: ForgeConfig, params: MannequinParams): Promise<string> {
     try {
-      const ai = await this.getAIInstance();
-      const prompt = `SPRITE_BASE_GENESIS: Featureless grey dummy, 2D pixel art, standing, front view. Background solid magenta #FF00FF.`;
+      await this.ensureKeyConnection();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
+      const prompt = `SPRITE_BASE: Humanoid mannequin dummy, ${params.gender}, ${params.build} build, standing pose, front view, 2D pixel art. No clothes. Background #FF00FF.`;
       
       const response = await ai.models.generateContent({
         model: this.IMAGE_MODEL,
@@ -118,38 +106,22 @@ export class GeminiService {
       
       const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
       if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-      throw new Error("No se pudo generar el maniquí.");
+      throw new Error("Fallo al generar base.");
     } catch (e) {
-      this.handleError(e);
-    }
-  }
-
-  static async getStructuredPrompt(messages: ChatMessage[]): Promise<string> {
-    try {
-      const ai = await this.getAIInstance();
-      const response = await ai.models.generateContent({
-        model: this.TEXT_MODEL,
-        contents: messages.map(m => ({ 
-          role: m.role === 'assistant' ? 'model' : 'user', 
-          parts: [{ text: m.content }] 
-        })),
-        config: { systemInstruction: "SpriteForge Oracle: Describe outfits for 2D sprites." }
-      });
-      return response.text || "";
-    } catch (e) {
-      this.handleError(e);
+      this.handleAIError(e);
     }
   }
 
   static async analyzeRigging(url: string): Promise<RiggingData> {
     try {
-      const ai = await this.getAIInstance();
+      await this.ensureKeyConnection();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       const response = await ai.models.generateContent({
         model: this.TEXT_MODEL,
         contents: { 
           parts: [
             { inlineData: { data: url.split(',')[1], mimeType: 'image/png' } }, 
-            { text: "Identify standard 2D rigging joints." }
+            { text: "Identify joints for 2D rigging in JSON." }
           ] 
         },
         config: {
@@ -164,8 +136,8 @@ export class GeminiService {
                   properties: {
                     id: { type: Type.STRING },
                     label: { type: Type.STRING },
-                    x: { type: Type.NUMBER },
-                    y: { type: Type.NUMBER }
+                    x: { type: Number },
+                    y: { type: Number }
                   }
                 }
               }
@@ -175,7 +147,25 @@ export class GeminiService {
       });
       return JSON.parse(response.text || '{"joints":[]}');
     } catch (e) {
-      this.handleError(e);
+      this.handleAIError(e);
+    }
+  }
+
+  static async getStructuredPrompt(messages: ChatMessage[]): Promise<string> {
+    try {
+      await this.ensureKeyConnection();
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const response = await ai.models.generateContent({
+        model: this.TEXT_MODEL,
+        contents: messages.map(m => ({ 
+          role: m.role === 'assistant' ? 'model' : 'user', 
+          parts: [{ text: m.content }] 
+        })),
+        config: { systemInstruction: "Ayuda a diseñar descripciones precisas para sprites de RPG." }
+      });
+      return response.text || "";
+    } catch (e) {
+      this.handleAIError(e);
     }
   }
 }

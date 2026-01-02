@@ -27,26 +27,12 @@ const App: React.FC = () => {
   const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
 
-  // Verificación silenciosa de llave al montar
-  useEffect(() => {
-    const checkKey = async () => {
-      const hasKey = typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey 
-        ? await (window as any).aistudio.hasSelectedApiKey() 
-        : !!process.env.API_KEY;
-      
-      if (!hasKey) {
-        forge.setError("ENLACE_REQUERIDO: No se detectó una llave activa. Para forjar sprites, vincula una clave de proyecto con facturación activa.");
-      }
-    };
-    checkKey();
-  }, []);
-
   const handleForge = useCallback(async () => {
     forge.setError(null);
     try {
       await forge.executeSynthesis(prompt);
     } catch (error: any) {
-      forge.setError(error.message || "Error desconocido en el motor.");
+      forge.setError(error.message || "Fallo en el motor.");
     }
   }, [forge, prompt]);
 
