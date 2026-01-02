@@ -1,22 +1,40 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useSpriteForge } from './hooks/useSpriteForge';
-import { Atelier } from './components/Atelier';
-import { EvolutionTree } from './components/EvolutionTree';
 import { ImageModal } from './components/ImageModal';
 import { HarmonizerGate } from './components/HarmonizerGate';
-import { ForgeOracle } from './components/ForgeOracle';
-import { MorphLab } from './components/MorphLab';
-import { RiggingLab } from './components/RiggingLab';
-import { AnimationLab } from './components/AnimationLab';
-import { EvolutionTimeline } from './components/EvolutionTimeline';
-import { Settings } from './components/Settings';
-import { GeneratedOutfit } from './types';
 import { Frame } from './components/Layout/Frame';
 import { SystemAlerts } from './components/Layout/SystemAlerts';
 import { GIcon, Icons } from './components/Icons';
 import { GeminiService } from './services/geminiService';
 import { ApiKeyManagerUI } from './components/ApiKeyManager';
+import { ErrorBoundary } from './components/ErrorBoundarySimple';
+
+// Lazy load heavy components
+const Atelier = lazy(() => import('./components/Atelier').then(module => ({ default: module.Atelier })));
+const EvolutionTree = lazy(() => import('./components/EvolutionTree').then(module => ({ default: module.EvolutionTree })));
+const ForgeOracle = lazy(() => import('./components/ForgeOracle').then(module => ({ default: module.ForgeOracle })));
+const MorphLab = lazy(() => import('./components/MorphLab').then(module => ({ default: module.MorphLab })));
+const RiggingLab = lazy(() => import('./components/RiggingLab').then(module => ({ default: module.RiggingLab })));
+const AnimationLab = lazy(() => import('./components/AnimationLab').then(module => ({ default: module.AnimationLab })));
+const EvolutionTimeline = lazy(() => import('./components/EvolutionTimeline').then(module => ({ default: module.EvolutionTimeline })));
+const Settings = lazy(() => import('./components/Settings').then(module => ({ default: module.Settings })));
+
+// Types
+interface GeneratedOutfit {
+  id: string;
+  url: string;
+  originalUrl: string;
+  parentId?: string;
+  prompt: string;
+  timestamp: number;
+  model: string;
+  aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
+  evolutionStep: number;
+  mode: "Draft" | "Master" | "Spritesheet" | "Orthographic" | "Animation";
+  mutationStrength?: number;
+  seed?: number;
+}
 
 const App: React.FC = () => {
   const forge = useSpriteForge();
@@ -71,52 +89,95 @@ const App: React.FC = () => {
     setSelectedOutfit(null);
   }, [forge]);
 
-  return (
-    <Frame activeTab={activeTab} onTabChange={setActiveTab} isGenerating={state.isGenerating} isZenMode={isZenMode}>
-      <SystemAlerts 
-        error={state.error} 
-        onClearError={() => forge.setError(null)} 
-        isSettingsPage={activeTab === 'settings'} 
-      />
-
-      {activeTab === 'forge' && (
-        <>
-          <Atelier 
-            state={state} 
-            prompt={prompt} 
-            setPrompt={setPrompt} 
-            onUpload={forge.setBaseImage} 
-            onUploadReference={forge.uploadReferenceAsset} 
-            onForge={handleForge} 
-            onCommit={() => setIsHarmonizerOpen(true)} 
-            onExtractBase={() => {}} 
-            onGenerateMannequin={forge.generateMannequin} 
-            onResetParent={() => forge.setActiveParent(null)} 
-            onUpdateMutation={(v) => forge.updateConfig({ mutationStrength: v })} 
-            onToggleNode={(id) => forge.toggleNode(id)} 
-            onSetMode={(m) => forge.updateConfig({ mode: m })} 
-            onApplyMacro={(macro) => forge.updateConfig({ activeMacroId: macro.id })} 
-            onPromoteToBase={(url) => forge.setBaseImage(url)} 
-            onUpdateConfig={(conf) => forge.updateConfig(conf)} 
-            hasApiKey={true} 
-            isZenMode={isZenMode} 
-            setIsZenMode={setIsZenMode} 
+    return (
+      <ErrorBoundary fallback={
+        <div className="h-full w-full flex items-center justify-center text-slate-500">
+          <div className="text-center">
+            <h2 className="text-xl font-bold mb-2">Application Error</h2>
+            <p>Please refresh the page to continue</p>
+          </div>
+        </div>
+      }>
+        <Frame activeTab={activeTab} onTabChange={setActiveTab} isGenerating={state.isGenerating} isZenMode={isZenMode}>
+          <SystemAlerts 
+            error={state.error} 
+            onClearError={() => forge.setError(null)} 
+            isSettingsPage={activeTab === 'settings'} 
           />
-          <button onClick={() => setIsOracleOpen(true)} className={`absolute right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-indigo-400 ${isZenMode ? 'bottom-6' : 'bottom-32'}`}><GIcon d={Icons.Crystal} size={24} /></button>
-          <button onClick={() => setIsApiKeyManagerOpen(true)} className={`absolute right-6 w-14 h-14 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(147,51,234,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-purple-400 ${isZenMode ? 'bottom-24' : 'bottom-20'}`}>
-            <GIcon d={Icons.Settings} size={20} />
-          </button>
-        </>
-      )}
-      
-      {activeTab === 'tree' && <EvolutionTree outfits={state.outfits} baseImage={state.baseImage} activeId={state.activeParent?.id} onSelect={setSelectedOutfit} />}
-      {activeTab === 'evolution' && <EvolutionTimeline state={state} onExecuteHybrid={() => {}} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'morph' && state.baseImage && <MorphLab state={state} onUpdateMorph={() => {}} onExecute={() => {}} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'rigging' && <RiggingLab state={state} onUpdateJoint={() => {}} onExecuteAnalysis={forge.executeRiggingAnalysis} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'animation' && <AnimationLab state={state} onExecuteAnimation={() => {}} onInterpolate={() => {}} onClose={() => setActiveTab('forge')} />}
-      {activeTab === 'settings' && <Settings />}
 
-      {isOracleOpen && <ForgeOracle archetypes={state.archetypes} onInject={setPrompt} onSaveArchetype={forge.saveArchetype} onDeleteArchetype={forge.deleteArchetype} onClose={() => setIsOracleOpen(false)} />}
+          {activeTab === 'forge' && (
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading Forge...</div>}>
+              <>
+                <Atelier 
+                  state={state} 
+                  prompt={prompt} 
+                  setPrompt={setPrompt} 
+                  onUpload={forge.setBaseImage} 
+                  onUploadReference={() => {}} 
+                  onForge={handleForge} 
+                  onCommit={() => setIsHarmonizerOpen(true)} 
+                  onExtractBase={() => {}} 
+                  onGenerateMannequin={forge.generateMannequin} 
+                  onResetParent={() => forge.setActiveParent(null)} 
+                  onUpdateMutation={(v) => forge.updateConfig({ mutationStrength: v })} 
+                  onToggleNode={(id) => forge.toggleNode(id)} 
+                  onSetMode={(m) => forge.updateConfig({ mode: m })} 
+                  onApplyMacro={(macro) => forge.updateConfig({ activeMacroId: macro.id })} 
+                  onPromoteToBase={(url) => forge.setBaseImage(url)} 
+                  onUpdateConfig={(conf) => forge.updateConfig(conf)} 
+                  hasApiKey={true} 
+                  isZenMode={isZenMode} 
+                  setIsZenMode={setIsZenMode} 
+                />
+                <button onClick={() => setIsOracleOpen(true)} className={`absolute right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-indigo-400 ${isZenMode ? 'bottom-6' : 'bottom-32'}`}><GIcon d={Icons.Crystal} size={24} /></button>
+                <button onClick={() => setIsApiKeyManagerOpen(true)} className={`absolute right-6 w-14 h-14 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(147,51,234,0.5)] z-[250] hover:scale-110 active:scale-95 transition-all border-2 border-purple-400 ${isZenMode ? 'bottom-24' : 'bottom-20'}`}>
+                  <GIcon d={Icons.Settings} size={20} />
+                </button>
+              </>
+            </Suspense>
+          )}
+        </Frame>
+      </ErrorBoundary>
+    );
+  };
+};
+      
+      {activeTab === 'tree' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <EvolutionTree outfits={state.outfits} baseImage={state.baseImage} activeId={state.activeParent?.id} onSelect={setSelectedOutfit} />
+        </Suspense>
+      )}
+      {activeTab === 'evolution' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <EvolutionTimeline state={state} onExecuteHybrid={() => {}} onClose={() => setActiveTab('forge')} />
+        </Suspense>
+      )}
+      {activeTab === 'morph' && state.baseImage && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <MorphLab state={state} onUpdateMorph={() => {}} onExecute={() => {}} onClose={() => setActiveTab('forge')} />
+        </Suspense>
+      )}
+      {activeTab === 'rigging' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <RiggingLab state={state} onUpdateJoint={() => {}} onExecuteAnalysis={forge.executeRiggingAnalysis} onClose={() => setActiveTab('forge')} />
+        </Suspense>
+      )}
+      {activeTab === 'animation' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <AnimationLab state={state} onExecuteAnimation={() => {}} onInterpolate={() => {}} onClose={() => setActiveTab('forge')} />
+        </Suspense>
+      )}
+      {activeTab === 'settings' && (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-slate-500">Loading...</div>}>
+          <Settings />
+        </Suspense>
+      )}
+
+      {isOracleOpen && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 text-slate-500">Loading...</div>}>
+          <ForgeOracle archetypes={state.archetypes} onInject={setPrompt} onSaveArchetype={forge.saveArchetype} onDeleteArchetype={forge.deleteArchetype} onClose={() => setIsOracleOpen(false)} />
+        </Suspense>
+      )}
       
       {isHarmonizerOpen && state.pendingOutfit && (
         <HarmonizerGate 
